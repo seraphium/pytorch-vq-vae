@@ -15,6 +15,7 @@ import torch.optim as optim
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 from torchvision.utils import make_grid
+from torch.utils.tensorboard import SummaryWriter
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
@@ -461,7 +462,7 @@ class Model(nn.Module):
 
 # %% Training preparation
 batch_size = 256
-num_training_updates = 1500
+num_epoch = 50
 
 num_hiddens = 128
 num_residual_hiddens = 32
@@ -505,8 +506,9 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate, amsgrad=False)
 model.train()
 train_res_recon_error = []
 train_res_perplexity = []
+writer = SummaryWriter()
 
-for epoch in range(num_training_updates):
+for epoch in range(num_epoch):
     for batch, (data, label) in enumerate(training_loader):
 
         data = data.to(device)
@@ -524,15 +526,14 @@ for epoch in range(num_training_updates):
         train_res_perplexity.append(perplex)
 
         print(
-            f"\rEpoch [{epoch+1}/{num_training_updates}] {batch+1}/{len(training_loader)} Loss_recon: {loss_recon:.4f} Perplexity: {perplex:.4f}",
+            f"\rEpoch [{epoch+1}/{num_epoch}] {batch+1}/{len(training_loader)} Loss_recon: {loss_recon:.4f} Perplexity: {perplex:.4f}",
             end="",
         )
 
-        if (epoch + 1) % 100 == 0:
-            print(f"{epoch + 1} epoch")
-            print("recon_error: %.3f" % np.mean(train_res_recon_error[-100:]))
-            print("perplexity: %.3f" % np.mean(train_res_perplexity[-100:]))
-            print()
+        writer.add_scalar(
+            "Reconstruction Loss", loss_recon, epoch * len(training_loader) + batch
+        )
+        writer.add_scalar("Perplexity", perplex, epoch * len(training_loader) + batch)
 
 torch.save(model.state_dict(), "model_weights.pth")
 
@@ -568,18 +569,18 @@ train_originals = train_originals.to(device)
 _, train_reconstructions, _, _ = model._vq_vae(train_originals)
 
 
-def show(img):
+def show(img, title=None):
     npimg = img.numpy()
+    plt.figure()
     fig = plt.imshow(np.transpose(npimg, (1, 2, 0)), interpolation="nearest")
-    fig.axes.get_xaxis().set_visible(False)
-    fig.axes.get_yaxis().set_visible(False)
+    plt.axis("off")
+    if title is not None:
+        plt.title(title)
 
 
-show(
-    make_grid(valid_reconstructions.cpu().data) + 0.5,
-)
+show(make_grid(valid_reconstructions.cpu().data + 0.5), title="Reconstructed Images")
 
-show(make_grid(valid_originals.cpu() + 0.5))
+show(make_grid(valid_originals.cpu() + 0.5), title="Original Images")
 
 # %% view embedding
 
