@@ -20,6 +20,15 @@ import torchvision.transforms as transforms
 from torchvision.utils import make_grid
 from torch.utils.tensorboard import SummaryWriter
 
+
+# show tensor size at beginning
+def custom_repr(self):
+    return f"{{Tensor:{tuple(self.shape)}}} {original_repr(self)}"
+
+
+original_repr = torch.Tensor.__repr__
+torch.Tensor.__repr__ = custom_repr
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
@@ -54,9 +63,13 @@ class FaceImageDataset(Dataset):
 
 # %%
 ## Vector Quantizer Layer
-# This layer takes a tensor to be quantized. The channel dimension will be used as the space in which to quantize. All other dimensions will be flattened and will be seen as different examples to quantize.
+# This layer takes a tensor to be quantized. The channel dimension will be used as the space in which to quantize.
+# All other dimensions will be flattened and will be seen as different examples to quantize.
 # The output tensor will have the same shape as the input.
-# As an example for a `BCHW` tensor of shape `[16, 64, 32, 32]`, we will first convert it to an `BHWC` tensor of shape `[16, 32, 32, 64]` and then reshape it into `[16384, 64]` and all `16384` vectors of size `64` will be quantized independently. In otherwords, the channels are used as the space in which to quantize. All other dimensions will be flattened and be seen as different examples to quantize, `16384` in this case.
+# As an example for a `BCHW` tensor of shape `[16, 64, 32, 32]`,
+# we will first convert it to an `BHWC` tensor of shape `[16, 32, 32, 64]`
+# and then reshape it into `[16384, 64]` and all `16384` vectors of size `64` will be quantized independently.
+# In otherwords, the channels are used as the space in which to quantize. All other dimensions will be flattened and be seen as different examples to quantize, `16384` in this case.
 class VectorQuantizer(nn.Module):
     def __init__(self, num_embeddings, embedding_dim, commitment_cost):
         super(VectorQuantizer, self).__init__()
@@ -387,7 +400,7 @@ num_embeddings = 512
 
 commitment_cost = 0.25
 
-decay = 0.99
+decay = 0 #0.99
 
 learning_rate = 1e-3
 
@@ -430,7 +443,7 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate, amsgrad=False)
 model.train()
 train_res_recon_error = []
 train_res_perplexity = []
-writer = SummaryWriter()
+# writer = SummaryWriter()
 
 for epoch in range(num_epoch):
     for batch, data in enumerate(training_loader):
@@ -454,10 +467,10 @@ for epoch in range(num_epoch):
             end="",
         )
 
-        writer.add_scalar(
-            "Reconstruction Loss", loss_recon, epoch * len(training_loader) + batch
-        )
-        writer.add_scalar("Perplexity", perplex, epoch * len(training_loader) + batch)
+        # writer.add_scalar(
+        #    "Reconstruction Loss", loss_recon, epoch * len(training_loader) + batch
+        # )
+        # writer.add_scalar("Perplexity", perplex, epoch * len(training_loader) + batch)
 
 torch.save(model.state_dict(), "model_weights.pth")
 
